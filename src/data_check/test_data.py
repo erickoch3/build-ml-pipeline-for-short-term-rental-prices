@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import scipy.stats
 
+MIN_DATA_ROWS = 15000
+MAX_DATA_ROWS = 1000000
 
 def test_column_names(data):
 
@@ -59,6 +61,13 @@ def test_similar_neigh_distrib(data: pd.DataFrame, ref_data: pd.DataFrame, kl_th
 
     assert scipy.stats.entropy(dist1, dist2, base=2) < kl_threshold
 
+
+def test_row_count(data):
+    assert MIN_DATA_ROWS < data.shape[0] < MAX_DATA_ROWS
+    
+def test_price_range(data, min_price, max_price):
+    assert data['price'].between(min_price, max_price).all(), \
+        f"Not all prices are between the specified range of {min_price} to {max_price}"
 
 ########################################################
 # Implement here test_row_count and test_price_range   #

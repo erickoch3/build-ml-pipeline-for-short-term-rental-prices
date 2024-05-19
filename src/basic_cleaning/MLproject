@@ -1,0 +1,39 @@
+name: basic_cleaning
+conda_env: conda.yml
+
+entry_points:
+  main:
+    parameters:
+
+      min_price:
+        description: Minimum Airbnb listing price to analyze
+        type: int
+
+      max_price:
+        description: Maximum Airbnb listing price to analyze
+        type: int
+      
+      input_artifact:
+        description: Name of the input artifact
+        type: string
+
+      output_artifact:
+        description: Name for the output artifact
+        type: string
+      
+      output_type:
+        description: Type of the output artifact
+        type: string
+
+      output_description:
+        description: Description of the output artifact
+        type: string
+
+    command: >-
+        python run.py \
+          --min_price {min_price} \
+          --max_price {max_price} \
+          --input_artifact {input_artifact} \
+          --output_artifact {output_artifact} \
+          --output_type {output_type} \
+          --output_description {output_description}
