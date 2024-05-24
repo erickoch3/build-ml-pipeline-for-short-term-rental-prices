@@ -1,6 +1,7 @@
 # Eric's NYC Airbnb Price Random Forest Project
 
 [Github Project Link](https://github.com/erickoch3/build-ml-pipeline-for-short-term-rental-prices/tree/1.0.1)
+
 [Weights and Biases Project](https://wandb.ai/ericwkoch/nyc_airbnb?nw=nwuserericwkoch)
 
 # Build an ML Pipeline for Short-Term Rental Prices in NYC
