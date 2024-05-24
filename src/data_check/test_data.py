@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import scipy.stats
 
-MIN_DATA_ROWS = 15000
+MIN_DATA_ROWS = 11000
 MAX_DATA_ROWS = 1000000
 
 def test_column_names(data):

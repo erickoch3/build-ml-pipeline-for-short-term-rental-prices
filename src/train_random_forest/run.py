@@ -17,7 +17,8 @@ from sklearn.compose import ColumnTransformer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.impute import SimpleImputer
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, FunctionTransformer
+from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder, FunctionTransformer, PolynomialFeatures, StandardScaler
+from geopy.distance import geodesic 
 
 import wandb
 from sklearn.ensemble import RandomForestRegressor
@@ -32,6 +33,23 @@ def delta_date_feature(dates):
     """
     date_sanitized = pd.DataFrame(dates).apply(pd.to_datetime)
     return date_sanitized.apply(lambda d: (d.max() -d).dt.days, axis=0).to_numpy()
+
+def review_intensity_feature(X):
+    X = np.array(X)  # Ensure X is a numpy array
+    reviews, last_review = X[:, 0], X[:, 1]
+    last_review_dates = pd.to_datetime(last_review, errors='coerce')
+    days_active = (pd.Timestamp.now() - last_review_dates).days
+    days_active = np.where(days_active == 0, 1, days_active)  # Avoid division by zero
+    return (reviews / (days_active / 30)).reshape(-1, 1)
+
+def calculate_distance(X):
+    lat1, lon1 = X[:, 0], X[:, 1]
+    times_square_coords = (40.7580, -73.9855)
+    return np.array([geodesic((lat1[i], lon1[i]), times_square_coords).miles for i in range(len(lat1))]).reshape(-1, 1)
+
+def host_duration_feature(df):
+    today = pd.Timestamp.now()
+    return (today - df).dt.days.values.reshape(-1, 1)
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
@@ -183,6 +201,16 @@ def get_inference_pipeline(rf_config, max_tfidf_features):
         SimpleImputer(strategy='constant', fill_value='2010-01-01'),
         FunctionTransformer(delta_date_feature, check_inverse=False, validate=False)
     )
+    
+    reviews_per_month = make_pipeline(
+        SimpleImputer(strategy="constant", fill_value=0),
+        FunctionTransformer(review_intensity_feature, validate=False)
+    )
+    
+    distance_to_times_square = make_pipeline(
+        SimpleImputer(strategy="constant", fill_value=0),
+        FunctionTransformer(calculate_distance, validate=False)
+    )
 
     # Some minimal NLP for the "name" column
     reshape_to_1d = FunctionTransformer(np.reshape, kw_args={"newshape": -1})
@@ -195,6 +223,15 @@ def get_inference_pipeline(rf_config, max_tfidf_features):
             stop_words='english'
         ),
     )
+    
+    poly_features = make_pipeline(
+        SimpleImputer(strategy="constant", fill_value=0),  # Impute NaNs before creating polynomial features
+        PolynomialFeatures(degree=2, interaction_only=True, include_bias=False),
+        StandardScaler()
+    )
+    
+    # Final imputer to ensure no NaNs in the final output
+    final_imputer = SimpleImputer(strategy='constant', fill_value=0)
 
     # Let's put everything together
     preprocessor = ColumnTransformer(
@@ -203,7 +240,10 @@ def get_inference_pipeline(rf_config, max_tfidf_features):
             ("non_ordinal_cat", non_ordinal_categorical_preproc, non_ordinal_categorical),
             ("impute_zero", zero_imputer, zero_imputed),
             ("transform_date", date_imputer, ["last_review"]),
-            ("transform_name", name_tfidf, ["name"])
+            ("reviews_per_month", reviews_per_month, ["number_of_reviews", "last_review"]),
+            ("transform_name", name_tfidf, ["name"]),
+            ("distance_to_times_square", distance_to_times_square, ["latitude", "longitude"]),
+            ("poly_features", poly_features, zero_imputed)
         ],
         remainder="drop",  # This drops the columns that we do not transform
     )
@@ -218,6 +258,7 @@ def get_inference_pipeline(rf_config, max_tfidf_features):
     # with the random forest instance that we just saved in the `random_forest` variable.
     sk_pipe = Pipeline(steps=[
         ("preprocessor", preprocessor),
+        ("final_imputer", final_imputer),  # Ensure no NaNs in final output
         ("random_forest", random_forest),
     ])
 
